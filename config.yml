@@ -1,0 +1,8 @@
+---
+
+is_debug: true
+ports:
+  http_port: 3000 # If 0 then automatic port selection
+  grpc_port: 4000 # If 0 then automatic port selection
+hosts:
+  auth_host: mail-service-auth
