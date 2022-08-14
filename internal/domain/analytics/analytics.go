@@ -39,7 +39,7 @@ func (s *Service) annotatedLogger(ctx context.Context) *zap.SugaredLogger {
 }
 
 func (s *Service) StoreEvent(ctx context.Context, event *models.Event) error {
-	return s.es.CreateEvent(ctx, event)
+	return s.es.CreateEventIfNotExists(ctx, event)
 }
 
 func (s *Service) GetReport(ctx context.Context, taskId string) (*models.Report, error) {

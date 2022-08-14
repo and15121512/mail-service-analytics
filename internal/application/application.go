@@ -9,6 +9,9 @@ import (
 	"gitlab.com/sukharnikov.aa/mail-service-analytics/internal/adapters/grpc"
 	"gitlab.com/sukharnikov.aa/mail-service-analytics/internal/adapters/http"
 	postgresdb "gitlab.com/sukharnikov.aa/mail-service-analytics/internal/adapters/postgres"
+	"gitlab.com/sukharnikov.aa/mail-service-analytics/internal/adapters/task"
+	"gitlab.com/sukharnikov.aa/mail-service-analytics/internal/adapters/task/kafka_consumer"
+	"gitlab.com/sukharnikov.aa/mail-service-analytics/internal/config"
 	"gitlab.com/sukharnikov.aa/mail-service-analytics/internal/domain/analytics"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -66,20 +69,32 @@ func Start(ctx context.Context) {
 	if err != nil {
 		logger.Sugar().Fatalf("http server creating failed: %s", err)
 	}
-	gs, err = grpc.New(logger.Sugar(), analyticsS)
+	//gs, err = grpc.New(logger.Sugar(), analyticsS)
+	//if err != nil {
+	//	logger.Sugar().Fatalf("grpc server creating failed: %s", err)
+	//}
+	kafkaHost := config.GetConfig(logger.Sugar()).Hosts.KafkaHost
+	kafkaPort := config.GetConfig(logger.Sugar()).Ports.KafkaPort
+	kafkaBrokerString := fmt.Sprintf("%s:%s", kafkaHost, kafkaPort)
+	kc, err := kafka_consumer.NewConsumer([]string{kafkaBrokerString}, "task-event", "analytics", logger.Sugar())
 	if err != nil {
-		logger.Sugar().Fatalf("grpc server creating failed: %s", err)
+		logger.Sugar().Fatalf("failed to create kafka producer: %s", err)
 	}
+
+	t := task.New(logger.Sugar(), analyticsS, kc)
 
 	var g errgroup.Group
 	g.Go(func() error {
 		return hs.Start()
 	})
+	//g.Go(func() error {
+	//	return gs.Start()
+	//})
 	g.Go(func() error {
-		return gs.Start()
+		return t.Start(ctx)
 	})
 
-	logger.Sugar().Info(fmt.Sprintf("app is started on ports: %d (http) and %d (grpc)", hs.Port(), gs.Port()))
+	logger.Sugar().Info(fmt.Sprintf("app is started on ports: %d (http)", hs.Port()))
 	err = g.Wait()
 	if err != nil {
 		logger.Sugar().Fatalw("http server start failed", zap.Error(err))

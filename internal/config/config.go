@@ -10,11 +10,13 @@ import (
 type Config struct {
 	IsDebug *bool `yaml:"is_debug"`
 	Ports   struct {
-		HttpPort string `yaml:"http_port"`
-		GrpcPort string `yaml:"grpc_port"`
+		HttpPort  string `yaml:"http_port"`
+		GrpcPort  string `yaml:"grpc_port"`
+		KafkaPort string `yaml:"kafka_port"`
 	}
 	Hosts struct {
-		AuthHost string `yaml:"auth_host"`
+		AuthHost  string `yaml:"auth_host"`
+		KafkaHost string `yaml:"kafka_host"`
 	}
 }
 

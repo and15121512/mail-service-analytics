@@ -6,7 +6,7 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-E
  	CREATE DATABASE analytics OWNER analytics;
 	\connect analytics;
 	CREATE TABLE event(
-		event_id VARCHAR(50)
+		event_id VARCHAR(50) PRIMARY KEY
 		, task_id VARCHAR(50)
 		, time TIMESTAMP
 		, type INTEGER

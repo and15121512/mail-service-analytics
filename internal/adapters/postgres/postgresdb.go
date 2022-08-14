@@ -43,10 +43,34 @@ func (db *PostgresDB) annotatedLogger(ctx context.Context) *zap.SugaredLogger {
 	)
 }
 
-func (db *PostgresDB) CreateEvent(ctx context.Context, event *models.Event) error {
+func (db *PostgresDB) CreateEventIfNotExists(ctx context.Context, event *models.Event) error {
 	logger := db.annotatedLogger(ctx)
 
-	_, err := db.DB.Exec(ctx, "INSERT INTO event VALUES ($1, $2, $3, $4, $5)",
+	tx, err := db.DB.Begin(ctx)
+	if err != nil {
+		logger.Errorf("failed to start transaction to create event: %s", err.Error())
+		return fmt.Errorf("failed to start transaction to create event: %s", err.Error())
+	}
+	defer tx.Rollback(ctx)
+
+	row := tx.QueryRow(ctx, "SELECT count(*) as events_cnt FROM event WHERE event_id = $1", event.EventId)
+	eventsCnt := 0
+	err = row.Scan(&eventsCnt)
+	if err != nil {
+		logger.Errorf("failed to count events with ID %s query: %s", event.EventId, err.Error())
+		return fmt.Errorf("failed to count events with ID %s query: %s", event.EventId, err.Error())
+	}
+	if eventsCnt > 0 {
+		logger.Infof("attempt to create existing event with ID %s detected", event.EventId)
+		err = tx.Commit(ctx)
+		if err != nil {
+			logger.Errorf("failed to commit transaction: %s", err.Error())
+			return fmt.Errorf("failed to commit transaction: %s", err.Error())
+		}
+		return nil
+	}
+
+	_, err = tx.Exec(ctx, "INSERT INTO event VALUES ($1, $2, $3, $4, $5)",
 		event.EventId,
 		event.TaskId,
 		event.Time,
@@ -58,6 +82,11 @@ func (db *PostgresDB) CreateEvent(ctx context.Context, event *models.Event) erro
 		return fmt.Errorf("failed to exec insert event query")
 	}
 
+	err = tx.Commit(ctx)
+	if err != nil {
+		logger.Errorf("failed to commit transaction: %s", err.Error())
+		return fmt.Errorf("failed to commit transaction: %s", err.Error())
+	}
 	return nil
 }
 
@@ -80,13 +109,13 @@ func (db *PostgresDB) CountDeclinedEvents(ctx context.Context) (int, error) {
 
 	row := db.DB.QueryRow(ctx, "SELECT count(*) as done_cnt FROM event WHERE status = $1", models.TaskDeclinedStatus)
 
-	doneCnt := 0
-	err := row.Scan(&doneCnt)
+	declinedCnt := 0
+	err := row.Scan(&declinedCnt)
 	if err != nil {
 		logger.Errorf("failed to exec count done events query: %s", err.Error())
 		return 0, fmt.Errorf("failed to exec count done events query: %s", err.Error())
 	}
-	return doneCnt, nil
+	return declinedCnt, nil
 }
 
 func (db *PostgresDB) GetEventsByTaskID(ctx context.Context, taskId string) ([]models.Event, error) {

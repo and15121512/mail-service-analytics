@@ -7,7 +7,7 @@ import (
 )
 
 type EventStorage interface {
-	CreateEvent(ctx context.Context, event *models.Event) error
+	CreateEventIfNotExists(ctx context.Context, event *models.Event) error
 	CountDoneEvents(ctx context.Context) (int, error)
 	CountDeclinedEvents(ctx context.Context) (int, error)
 	GetEventsByTaskID(ctx context.Context, taskId string) ([]models.Event, error)
